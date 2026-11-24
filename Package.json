@@ -1,1 +1,13 @@
 
+{
+  "name": "kayzu-bot-creator",
+  "version": "1.0.0",
+  "description": "Kayzu AI - Telegram Bot Creator",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
