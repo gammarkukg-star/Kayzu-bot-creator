@@ -1,0 +1,116 @@
+
+const express = require("express");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+app.get("/", (req, res) => {
+  res.send("Kayzu AI is running!");
+});
+
+async function telegram(method, data = {}) {
+  const response = await fetch(
+    `https://api.telegram.org/bot${TOKEN}/${method}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!result.ok) {
+    throw new Error(result.description);
+  }
+
+  return result.result;
+}
+
+async function sendMessage(chatId, text) {
+  return telegram("sendMessage", {
+    chat_id: chatId,
+    text
+  });
+}
+
+async function handleUpdate(update) {
+  if (update.message) {
+    const chatId = update.message.chat.id;
+    const message = update.message.text || "";
+
+    if (message === "/start") {
+      await sendMessage(
+        chatId,
+        "Привет! Я Kayzu AI 🤖\n\nЯ помогу создавать Telegram-ботов.\n\nКоманды:\n/create — создать бота\n/help — помощь"
+      );
+    }
+
+    if (message === "/help") {
+      await sendMessage(
+        chatId,
+        "Kayzu AI — твой помощник по созданию Telegram-ботов.\n\nНапиши /create, чтобы начать."
+      );
+    }
+
+    if (message === "/create") {
+      const link =
+        "https://t.me/newbot/KayzuManagerBot";
+
+      await sendMessage(
+        chatId,
+        "Нажми на ссылку, чтобы начать создание своего управляемого бота:\n\n" + link
+      );
+    }
+  }
+
+  if (update.managed_bot) {
+    console.log("Получено событие создания или изменения управляемого бота.");
+  }
+}
+
+async function startPolling() {
+  await telegram("deleteWebhook", {
+    drop_pending_updates: false
+  });
+
+  const me = await telegram("getMe");
+  console.log("Kayzu AI started:", me.username);
+
+  let offset = 0;
+
+  while (true) {
+    try {
+      const updates = await telegram("getUpdates", {
+        offset,
+        timeout: 30,
+        allowed_updates: ["message", "managed_bot"]
+      });
+
+      for (const update of updates) {
+        offset = update.update_id + 1;
+
+        try {
+          await handleUpdate(update);
+        } catch (error) {
+          console.error("Update error:", error.message);
+        }
+      }
+    } catch (error) {
+      console.error("Telegram error:", error.message);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+}
+
+app.listen(PORT, () => {
+  console.log("Server listening on port", PORT);
+
+  if (!TOKEN) {
+    console.error("TELEGRAM_BOT_TOKEN is missing!");
+    process.exit(1);
+  }
+
+  startPolling().catch(console.error);
+});
